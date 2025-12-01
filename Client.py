@@ -61,7 +61,16 @@ class Client:
 			self.sendRtspRequest(self.SETUP)
 	
 	def exitClient(self):
-		self.sendRtspRequest(self.TEARDOWN)		
+		self.sendRtspRequest(self.TEARDOWN)
+		# Aguarda a thread RTP encerrar e fecha o socket
+		if hasattr(self, 'playEvent'):
+			self.playEvent.set()
+		if hasattr(self, 'rtpSocket'):
+			try:
+				self.rtpSocket.shutdown(socket.SHUT_RDWR)
+				self.rtpSocket.close()
+			except Exception:
+				pass
 		self.master.destroy()
 		try:
 			os.remove(CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT)
@@ -70,6 +79,8 @@ class Client:
 
 	def pauseMovie(self):
 		if self.state == self.PLAYING:
+			if hasattr(self, 'playEvent'):
+				self.playEvent.set()
 			self.sendRtspRequest(self.PAUSE)
 	
 	def playMovie(self):
@@ -79,30 +90,33 @@ class Client:
 			self.playEvent.clear()
 			self.sendRtspRequest(self.PLAY)
 	
-	def listenRtp(self):		
+	def listenRtp(self):
+		print("[DEBUG] RTP listening thread started")
 		while True:
 			try:
 				data = self.rtpSocket.recv(20480)
 				if data:
 					rtpPacket = RtpPacket()
 					rtpPacket.decode(data)
-					
 					currFrameNbr = rtpPacket.seqNum()
 					print("Current Seq Num: " + str(currFrameNbr))
-					
 					if currFrameNbr > self.frameNbr:
 						self.frameNbr = currFrameNbr
 						self.updateMovie(self.writeFrame(rtpPacket.getPayload()))
 			except Exception as e:
-				if hasattr(self, 'playEvent') and self.playEvent.is_set(): 
+				if hasattr(self, 'playEvent') and self.playEvent.is_set():
+					print("[DEBUG] RTP listening thread stopped by playEvent.")
 					break
 				if self.teardownAcked == 1:
+					print("[DEBUG] RTP listening thread stopped by teardownAcked.")
 					try:
 						self.rtpSocket.shutdown(socket.SHUT_RDWR)
 						self.rtpSocket.close()
 					except Exception:
 						pass
 					break
+				# Para debug de outros erros
+				print(f"[DEBUG] RTP Exception: {e}")
 					
 	def writeFrame(self, data):
 		cachename = CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT

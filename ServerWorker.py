@@ -82,22 +82,23 @@ class ServerWorker:
 			
 	def sendRtp(self):
 		"""Send RTP packets over UDP."""
+		print("[DEBUG] RTP sending thread started")
 		while True:
-			self.clientInfo['event'].wait(0.05) 
-			if self.clientInfo['event'].isSet(): 
-				break 
+			self.clientInfo['event'].wait(0.05)
+			if self.clientInfo['event'].isSet():
+				print("[DEBUG] RTP sending thread stopped by event.")
+				break
 			data = self.clientInfo['videoStream'].nextFrame()
-			if data: 
+			if data:
 				frameNumber = self.clientInfo['videoStream'].frameNbr()
 				try:
 					address = self.clientInfo['rtspSocket'][1][0]
 					port = int(self.clientInfo['rtpPort'])
-					self.clientInfo['rtpSocket'].sendto(self.makeRtp(data, frameNumber),(address,port))
-				except:
-					print("Connection Error")
-					# print('-'*60)
-					# traceback.print_exc(file=sys.stdout)
-					# print('-'*60)
+					self.clientInfo['rtpSocket'].sendto(self.makeRtp(data, frameNumber), (address, port))
+					print(f"[DEBUG] Sent frame {frameNumber} to {address}:{port}")
+				except Exception as e:
+					print(f"[DEBUG] RTP send error: {e}")
+					break
 
 	def makeRtp(self, payload, frameNbr):
 		"""RTP-packetize the video data."""
