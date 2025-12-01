@@ -1,0 +1,2 @@
+# SERVER CLIENT PROJECT
+RTSP & RTP prototype
